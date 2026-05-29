@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BudgetViz — Expense &amp; Income Tracker</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <i class="fa-solid fa-wallet"></i>
+      <span>BudgetViz</span>
+    </div>
+    <div class="header-actions">
+      <!-- Currency Picker dengan Search -->
+      <div class="cur-picker" id="curPicker">
+        <button class="cur-trigger" id="curTrigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Pilih mata uang">
+          <i class="fa-solid fa-coins"></i>
+          <span class="cur-trigger-label" id="curTriggerLabel">IDR</span>
+          <i class="fa-solid fa-chevron-down cur-trigger-arrow"></i>
+        </button>
+        <div class="cur-dropdown" id="curDropdown" role="dialog" aria-label="Pilih mata uang" hidden>
+          <div class="cur-search-wrap">
+            <i class="fa-solid fa-magnifying-glass cur-search-icon"></i>
+            <input
+              type="text"
+              id="curSearchInput"
+              class="cur-search-input"
+              placeholder="Cari mata uang atau negara..."
+              autocomplete="off"
+              spellcheck="false"
+              aria-label="Cari mata uang"
+            />
+            <button class="cur-search-clear" id="curSearchClear" type="button" aria-label="Hapus pencarian" hidden>
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div class="cur-list-wrap">
+            <ul class="cur-list" id="curList" role="listbox" aria-label="Daftar mata uang"></ul>
+            <div class="cur-no-result" id="curNoResult" hidden>
+              <i class="fa-solid fa-face-frown-open"></i>
+              <span>Tidak ditemukan</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Hidden select untuk kompatibilitas (tidak ditampilkan) -->
+      <select id="currencySelect" aria-hidden="true" style="display:none"></select>
+      <button id="clearAllBtn" class="btn-icon btn-icon--danger" title="Hapus semua transaksi" style="display:none" aria-label="Hapus semua transaksi">
+        <i class="fa-solid fa-trash"></i>
+      </button>
+      <button id="themeToggle" class="btn-icon" title="Ganti tema" aria-label="Ganti tema">
+        <i class="fa-solid fa-moon" id="themeIcon"></i>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- Balance Card -->
+  <section class="balance-card" aria-label="Ringkasan saldo">
+    <div class="balance-main">
+      <p class="balance-label"><i class="fa-solid fa-scale-balanced"></i> Total Saldo</p>
+      <div class="balance-amount-wrap">
+        <h1 class="balance-amount" id="totalBalance">Rp&nbsp;0</h1>
+        <span class="balance-idr-note" id="balanceIdrNote" hidden></span>
+      </div>
+      <p class="balance-sub" id="balanceSub">Belum ada transaksi</p>
+    </div>
+    <div class="balance-stats">
+      <div class="bstat bstat--income">
+        <i class="fa-solid fa-arrow-trend-up"></i>
+        <div class="bstat-body">
+          <span class="bstat-val" id="totalIncome">0</span>
+          <span class="bstat-lbl">Pemasukan</span>
+        </div>
+      </div>
+      <div class="bstat bstat--expense">
+        <i class="fa-solid fa-arrow-trend-down"></i>
+        <div class="bstat-body">
+          <span class="bstat-val" id="totalExpense">0</span>
+          <span class="bstat-lbl">Pengeluaran</span>
+        </div>
+      </div>
+      <div class="bstat">
+        <i class="fa-solid fa-receipt"></i>
+        <div class="bstat-body">
+          <span class="bstat-val" id="txCount">0</span>
+          <span class="bstat-lbl">Transaksi</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Filter Bar -->
+  <section class="filter-bar glass-card" aria-label="Filter bulan">
+    <div class="filter-left">
+      <i class="fa-solid fa-calendar-days"></i>
+      <label for="monthFilter">Filter Bulan:</label>
+      <div class="sel-wrap">
+        <select id="monthFilter" aria-label="Pilih bulan">
+          <option value="all">Semua Bulan</option>
+        </select>
+        <i class="fa-solid fa-chevron-down sel-arrow" aria-hidden="true"></i>
+      </div>
+    </div>
+    <span class="month-badge" id="monthBadge" hidden aria-live="polite"></span>
+  </section>
+
+  <!-- Grid: Chart + Form -->
+  <div class="grid-two">
+
+    <!-- Chart -->
+    <section class="glass-card chart-section" aria-label="Grafik pengeluaran">
+      <h2 class="section-title"><i class="fa-solid fa-chart-pie" aria-hidden="true"></i> Distribusi Pengeluaran</h2>
+      <div class="chart-wrap">
+        <canvas id="expenseChart" role="img" aria-label="Pie chart distribusi pengeluaran per kategori"></canvas>
+        <div class="chart-empty" id="chartEmpty" aria-live="polite">
+          <i class="fa-solid fa-chart-pie" aria-hidden="true"></i>
+          <p>Tidak ada data pengeluaran</p>
+        </div>
+      </div>
+      <div class="chart-legend" id="chartLegend" aria-label="Legenda chart"></div>
+    </section>
+
+    <!-- Form -->
+    <section class="glass-card form-section" aria-label="Form tambah transaksi">
+      <h2 class="section-title"><i class="fa-solid fa-plus-circle" aria-hidden="true"></i> Tambah Transaksi</h2>
+
+      <form id="expenseForm" novalidate aria-label="Form input transaksi">
+
+        <!-- Tipe -->
+        <div class="form-group">
+          <span class="label-text"><i class="fa-solid fa-toggle-on" aria-hidden="true"></i> Tipe Transaksi</span>
+          <div class="type-toggle" role="group" aria-label="Pilih tipe transaksi">
+            <input type="radio" name="txType" id="typeExpense" value="expense" checked />
+            <label for="typeExpense" class="type-btn type-btn--expense sel-expense">
+              <i class="fa-solid fa-minus-circle" aria-hidden="true"></i> Pengeluaran
+            </label>
+            <input type="radio" name="txType" id="typeIncome" value="income" />
+            <label for="typeIncome" class="type-btn type-btn--income">
+              <i class="fa-solid fa-plus-circle" aria-hidden="true"></i> Pemasukan
+            </label>
+          </div>
+        </div>
+
+        <!-- Nama -->
+        <div class="form-group">
+          <label for="itemName" class="label-text"><i class="fa-solid fa-tag" aria-hidden="true"></i> Nama Item</label>
+          <input type="text" id="itemName" placeholder="Contoh: Gaji bulanan" autocomplete="off" maxlength="80" aria-required="true" aria-describedby="nameError" />
+          <span class="field-error" id="nameError" role="alert"></span>
+        </div>
+
+        <!-- Jumlah -->
+        <div class="form-group">
+          <label for="itemAmount" class="label-text">
+            <i class="fa-solid fa-money-bill-wave" aria-hidden="true"></i>
+            Jumlah (<span id="currencyLabel">Rp</span>)
+          </label>
+          <div class="input-pfx-wrap">
+            <span class="input-pfx" id="amountPrefix" aria-hidden="true">Rp</span>
+            <input type="text" id="itemAmount" placeholder="0" inputmode="numeric" autocomplete="off" aria-required="true" aria-describedby="amountError idrPreview" />
+          </div>
+          <div class="idr-preview" id="idrPreview" hidden aria-live="polite">
+            <i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i>
+            <span id="idrPreviewText"></span>
+          </div>
+          <span class="field-error" id="amountError" role="alert"></span>
+        </div>
+
+        <!-- Kategori -->
+        <div class="form-group">
+          <label for="itemCategory" class="label-text"><i class="fa-solid fa-layer-group" aria-hidden="true"></i> Kategori</label>
+          <div class="sel-wrap">
+            <select id="itemCategory" aria-required="true" aria-describedby="categoryError">
+              <option value="">-- Pilih Kategori --</option>
+            </select>
+            <i class="fa-solid fa-chevron-down sel-arrow" aria-hidden="true"></i>
+          </div>
+          <span class="field-error" id="categoryError" role="alert"></span>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="addBtn">
+          <i class="fa-solid fa-plus" aria-hidden="true"></i>
+          <span id="addBtnText">Tambah Pengeluaran</span>
+        </button>
+      </form>
+
+      <!-- Custom Category -->
+      <div class="custom-cat-section">
+        <h3 class="sub-title"><i class="fa-solid fa-sliders" aria-hidden="true"></i> Kategori Kustom</h3>
+        <div class="cat-input-row">
+          <input type="text" id="newCatInput" placeholder="Nama kategori baru..." maxlength="30" aria-label="Nama kategori baru" aria-describedby="catError" />
+          <button id="addCatBtn" class="btn btn-secondary" aria-label="Tambah kategori">
+            <i class="fa-solid fa-plus" aria-hidden="true"></i>
+          </button>
+        </div>
+        <span class="field-error" id="catError" role="alert"></span>
+        <div class="cat-tags" id="customCatTags" aria-label="Daftar kategori kustom"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Transaction List -->
+  <section class="glass-card list-section" aria-label="Daftar transaksi">
+    <div class="list-header">
+      <h2 class="section-title"><i class="fa-solid fa-list-ul" aria-hidden="true"></i> Daftar Transaksi</h2>
+      <div class="sort-controls" role="group" aria-label="Urutkan transaksi">
+        <span class="sort-lbl">Urutkan:</span>
+        <button class="sort-btn active" data-sort="date" title="Terbaru dulu"><i class="fa-solid fa-clock" aria-hidden="true"></i><span>Terbaru</span></button>
+        <button class="sort-btn" data-sort="name" title="Nama A-Z"><i class="fa-solid fa-arrow-down-a-z" aria-hidden="true"></i><span>Nama</span></button>
+        <button class="sort-btn" data-sort="amount" title="Jumlah"><i class="fa-solid fa-arrow-down-1-9" aria-hidden="true"></i><span>Jumlah</span></button>
+        <button class="sort-btn" data-sort="category" title="Kategori A-Z"><i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Kategori</span></button>
+      </div>
+    </div>
+    <div class="tx-list" id="transactionList" role="list" aria-label="Daftar transaksi" aria-live="polite"></div>
+    <div class="empty-state" id="emptyState" aria-hidden="true">
+      <span class="empty-icon" aria-hidden="true">✨</span>
+      <p class="empty-title">Belum ada transaksi</p>
+      <p class="empty-sub">Tambahkan transaksi pertamamu di atas!</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <p>BudgetViz &copy; 2026 — Built with <i class="fa-solid fa-heart" style="color:#f87171" aria-hidden="true"></i> Vanilla JS &amp; Chart.js</p>
+</footer>
+
+<!-- Toast Notification -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalBody">
+  <div class="modal-box glass-card">
+    <div class="modal-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <h3 class="modal-title" id="modalTitle">Hapus Semua Transaksi?</h3>
+    <p class="modal-body" id="modalBody">Tindakan ini tidak dapat dibatalkan. Semua data transaksi akan hilang permanen.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modalCancel">Batal</button>
+      <button class="btn btn-danger-solid" id="modalConfirm"><i class="fa-solid fa-trash" aria-hidden="true"></i> Hapus Semua</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/script.js"></script>
+</body>
+</html>
